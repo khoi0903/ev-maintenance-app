@@ -6,6 +6,7 @@ app.use(express.json());
 
 // Routes
 const authRoutes = require('./routes/authRoutes');
+console.log("DEBUG:", authRoutes);   // 👈 thêm dòng này
 app.use('/api/auth', authRoutes);
 
 // health check
