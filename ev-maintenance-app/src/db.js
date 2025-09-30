@@ -35,13 +35,7 @@ const poolPromise = new sql.ConnectionPool(config)
   .then(async pool => {
     console.log("✅ Kết nối SQL Server thành công");
 
-    // Test query ngay khi connect
-    try {
-      const result = await pool.request().query("SELECT TOP 1 * FROM Account");
-      console.log("🔎 Test query Account:", result.recordset);
-    } catch (qErr) {
-      console.error("❌ Query lỗi:", qErr);
-    }
+  
 
     return pool;
   })

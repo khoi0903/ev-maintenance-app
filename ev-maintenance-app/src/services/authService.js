@@ -48,7 +48,7 @@ class AuthService {
     const user = await accountRepository.getAccountByUsername(username);
     if (!user) throw new Error("Invalid username or password");
 
-    const match = await bcrypt.compare(password, user.PasswordHash);
+    const match = await bcrypt.compare(password, user.PasswordHash.toString());
     if (!match) throw new Error("Invalid username or password");
 
     const token = jwt.sign(

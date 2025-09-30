@@ -1,29 +1,68 @@
-const { sql, poolPromise } = require("../db");
+const pool = require("../db");
 
-// Tạo account
-async function createAccount({ username, passwordHash, role, fullName, email }) {
-  const pool = await poolPromise;
-  const result = await pool.request()
-    .input("Username", sql.NVarChar, username)
-    .input("PasswordHash", sql.NVarChar, passwordHash)
-    .input("Role", sql.NVarChar, role)
-    .input("FullName", sql.NVarChar, fullName)
-    .input("Email", sql.NVarChar, email)
-    .query(`
-      INSERT INTO Account (Username, PasswordHash, Role, FullName, Email)
-      OUTPUT INSERTED.*
-      VALUES (@Username, @PasswordHash, @Role, @FullName, @Email)
-    `);
-  return result.recordset[0];
+class AccountRepository {
+  async getAccountByUsername(username) {
+    const result = await pool
+      .request()
+      .input("username", username)
+      .query("SELECT * FROM Account WHERE Username = @username AND Status = 'Active'");
+    return result.recordset[0];
+  }
+
+  async getAccountById(id) {
+    const result = await pool
+      .request()
+      .input("id", id)
+      .query("SELECT * FROM Account WHERE AccountID = @id AND Status = 'Active'");
+    return result.recordset[0];
+  }
+
+  async createAccount({ username, passwordHash, role, fullName, email }) {
+    await pool
+      .request()
+      .input("username", username)
+      .input("passwordHash", Buffer.from(passwordHash, "utf-8"))
+      .input("role", role)
+      .input("fullName", fullName)
+      .input("email", email)
+      .query(`
+        INSERT INTO Account (Username, PasswordHash, Role, FullName, Email)
+        VALUES (@username, @passwordHash, @role, @fullName, @email)
+      `);
+  }
+
+  async updateAccount(id, { fullName, email, phone, address }) {
+    await pool
+      .request()
+      .input("id", id)
+      .input("fullName", fullName)
+      .input("email", email)
+      .input("phone", phone)
+      .input("address", address)
+      .input("updatedAt", new Date())
+      .query(`
+        UPDATE Account
+        SET FullName = @fullName,
+            Email = @email,
+            Phone = @phone,
+            Address = @address,
+            UpdatedAt = @updatedAt
+        WHERE AccountID = @id
+      `);
+  }
+
+  async deactivateAccount(id) {
+    await pool
+      .request()
+      .input("id", id)
+      .input("updatedAt", new Date())
+      .query(`
+        UPDATE Account
+        SET Status = 'Inactive',
+            UpdatedAt = @updatedAt
+        WHERE AccountID = @id
+      `);
+  }
 }
 
-// Lấy account theo username
-async function getAccountByUsername(username) {
-  const pool = await poolPromise;
-  const result = await pool.request()
-    .input("Username", sql.NVarChar, username)
-    .query("SELECT * FROM Account WHERE Username = @Username");
-  return result.recordset[0];
-}
-
-module.exports = { createAccount, getAccountByUsername };
+module.exports = new AccountRepository();

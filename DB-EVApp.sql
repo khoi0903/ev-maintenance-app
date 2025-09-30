@@ -1,8 +1,8 @@
-﻿-- ========================
--- 1. Xoá DB cũ (nếu có)
--- ========================
+﻿-- ============================================
+-- EVServiceCenterDB - Final Optimized Schema
+-- ============================================
+
 USE master;
-GO
 IF DB_ID('EVServiceCenterDB') IS NOT NULL
 BEGIN
     ALTER DATABASE EVServiceCenterDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
@@ -10,41 +10,38 @@ BEGIN
 END
 GO
 
--- ========================
--- 2. Tạo DB mới
--- ========================
 CREATE DATABASE EVServiceCenterDB;
 GO
 USE EVServiceCenterDB;
 GO
 
--- ========================
--- 3. Schema
--- ========================
-
--- 1. Account
+-- Account
 CREATE TABLE Account (
     AccountID INT PRIMARY KEY IDENTITY,
     Username NVARCHAR(50) UNIQUE NOT NULL,
-    PasswordHash NVARCHAR(255) NOT NULL,
+    PasswordHash VARBINARY(512) NOT NULL, -- bcrypt hash
     Role NVARCHAR(20) NOT NULL CHECK (Role IN ('Customer','Staff','Technician','Admin')),
     FullName NVARCHAR(100) NOT NULL,
     Phone NVARCHAR(20),
-    Email NVARCHAR(100) UNIQUE,
+    Email NVARCHAR(100) NULL,
     Address NVARCHAR(200),
     Status NVARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (Status IN ('Active','Inactive','Banned')),
-    CreatedDate DATETIME NOT NULL DEFAULT GETDATE()
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
+CREATE UNIQUE INDEX UX_Account_Email ON Account(Email) WHERE Email IS NOT NULL;
 
--- 2. Model
+-- Model
 CREATE TABLE Model (
     ModelID INT PRIMARY KEY IDENTITY,
     Brand NVARCHAR(100) NOT NULL,
     ModelName NVARCHAR(100) NOT NULL,
-    EngineSpec NVARCHAR(200)
+    EngineSpec NVARCHAR(200),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
 
--- 3. Vehicle
+-- Vehicle
 CREATE TABLE Vehicle (
     VehicleID INT PRIMARY KEY IDENTITY,
     AccountID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
@@ -52,234 +49,111 @@ CREATE TABLE Vehicle (
     VIN NVARCHAR(100) UNIQUE NOT NULL,
     LicensePlate NVARCHAR(50) UNIQUE NOT NULL,
     Year INT,
-    LastServiceDate DATE
+    LastServiceDate DATE,
+    Status NVARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (Status IN ('Active','Inactive')),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
 
--- 4. Slot
+-- Slot
 CREATE TABLE Slot (
     SlotID INT PRIMARY KEY IDENTITY,
     StaffID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
-    StartTime DATETIME NOT NULL,
-    EndTime DATETIME NOT NULL,
-    Status NVARCHAR(20) NOT NULL CHECK (Status IN ('Free','Booked','Cancelled'))
+    StartTime DATETIME2 NOT NULL,
+    EndTime DATETIME2 NOT NULL,
+    Capacity INT NOT NULL DEFAULT 4 CHECK (Capacity > 0),
+    Status NVARCHAR(20) NOT NULL DEFAULT 'Free' CHECK (Status IN ('Free','Booked','Cancelled')),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL,
+    CONSTRAINT CK_Slot_StartEnd CHECK (StartTime < EndTime)
 );
 
--- 5. Appointment
+-- Appointment
 CREATE TABLE Appointment (
     AppointmentID INT PRIMARY KEY IDENTITY,
     AccountID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
     VehicleID INT NOT NULL FOREIGN KEY REFERENCES Vehicle(VehicleID),
     SlotID INT NOT NULL FOREIGN KEY REFERENCES Slot(SlotID),
-    ScheduledDate DATETIME NOT NULL,
-    Status NVARCHAR(20) NOT NULL CHECK (Status IN ('Pending','Confirmed','Completed','Cancelled')),
-    Notes NVARCHAR(255)
+    ScheduledDate DATETIME2 NOT NULL,
+    Status NVARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (Status IN ('Pending','Confirmed','Completed','Cancelled')),
+    TechnicianID INT NULL FOREIGN KEY REFERENCES Account(AccountID),
+    Notes NVARCHAR(255),
+    DepositAmount DECIMAL(18,2) NOT NULL DEFAULT 100000,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
 
--- 6. ServiceCatalog
+-- ServiceCatalog
 CREATE TABLE ServiceCatalog (
     ServiceID INT PRIMARY KEY IDENTITY,
     ServiceName NVARCHAR(100) NOT NULL,
     Description NVARCHAR(255),
-    StandardCost DECIMAL(18,2) NOT NULL
+    StandardCost DECIMAL(18,2) NOT NULL,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
 
--- 7. WorkOrder
+-- WorkOrder
 CREATE TABLE WorkOrder (
     WorkOrderID INT PRIMARY KEY IDENTITY,
     AppointmentID INT NOT NULL FOREIGN KEY REFERENCES Appointment(AppointmentID),
     TechnicianID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
-    StartTime DATETIME,
-    EndTime DATETIME,
-    ProgressStatus NVARCHAR(20) NOT NULL CHECK (ProgressStatus IN ('Pending','InProgress','Done')),
-    TotalAmount DECIMAL(18,2) DEFAULT 0
+    StartTime DATETIME2,
+    EndTime DATETIME2,
+    ProgressStatus NVARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (ProgressStatus IN ('Pending','InProgress','Done')),
+    TotalAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
 
--- 8. WorkOrderDetail
-CREATE TABLE WorkOrderDetail (
-    WorkOrderDetailID INT PRIMARY KEY IDENTITY,
-    WorkOrderID INT NOT NULL FOREIGN KEY REFERENCES WorkOrder(WorkOrderID),
-    ServiceID INT NOT NULL FOREIGN KEY REFERENCES ServiceCatalog(ServiceID),
-    Quantity INT NOT NULL CHECK (Quantity > 0),
-    UnitPrice DECIMAL(18,2) NOT NULL,
-    SubTotal AS (Quantity * UnitPrice) PERSISTED
-);
-
--- 9. PartInventory
-CREATE TABLE PartInventory (
-    PartID INT PRIMARY KEY IDENTITY,
-    PartName NVARCHAR(100) NOT NULL,
-    ModelID INT NOT NULL FOREIGN KEY REFERENCES Model(ModelID),
-    StockQuantity INT NOT NULL DEFAULT 0,
-    UnitPrice DECIMAL(18,2) NOT NULL,
-    MinStock INT DEFAULT 0
-);
-
--- 10. PartUsage
-CREATE TABLE PartUsage (
-    UsageID INT PRIMARY KEY IDENTITY,
-    WorkOrderID INT NOT NULL FOREIGN KEY REFERENCES WorkOrder(WorkOrderID),
-    PartID INT NOT NULL FOREIGN KEY REFERENCES PartInventory(PartID),
-    Quantity INT NOT NULL CHECK (Quantity > 0),
-    SuggestedByTech BIT DEFAULT 1,
-    ApprovedByStaff BIT DEFAULT 0
-);
-
--- 11. Invoice
+-- Invoice
 CREATE TABLE Invoice (
     InvoiceID INT PRIMARY KEY IDENTITY,
-    WorkOrderID INT NOT NULL FOREIGN KEY REFERENCES WorkOrder(WorkOrderID),
+    AppointmentID INT NULL FOREIGN KEY REFERENCES Appointment(AppointmentID),
+    WorkOrderID INT NULL FOREIGN KEY REFERENCES WorkOrder(WorkOrderID),
     TotalAmount DECIMAL(18,2) NOT NULL,
-    PaymentStatus NVARCHAR(20) NOT NULL CHECK (PaymentStatus IN ('Paid','Unpaid'))
+    PaymentStatus NVARCHAR(20) NOT NULL DEFAULT 'Unpaid' CHECK (PaymentStatus IN ('Paid','Unpaid')),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL,
+    CONSTRAINT CK_Invoice_XOR CHECK (
+        (AppointmentID IS NOT NULL AND WorkOrderID IS NULL)
+        OR (AppointmentID IS NULL AND WorkOrderID IS NOT NULL)
+    )
 );
 
--- 12. PaymentTransaction (InvoiceID có thể NULL)
+-- PaymentTransaction
 CREATE TABLE PaymentTransaction (
     TransactionID INT PRIMARY KEY IDENTITY,
-    InvoiceID INT NULL FOREIGN KEY REFERENCES Invoice(InvoiceID),
+    InvoiceID INT NOT NULL FOREIGN KEY REFERENCES Invoice(InvoiceID),
     Amount DECIMAL(18,2) NOT NULL,
-    PaymentDate DATETIME NOT NULL DEFAULT GETDATE(),
+    PaymentDate DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     Method NVARCHAR(50) NOT NULL CHECK (Method IN ('eWallet','Banking','CreditCard','Cash')),
-    Status NVARCHAR(20) NOT NULL CHECK (Status IN ('Success','Failed','Pending'))
+    Status NVARCHAR(20) NOT NULL CHECK (Status IN ('Success','Failed','Pending')),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
 
--- 13. ChatMessage
-CREATE TABLE ChatMessage (
-    MessageID INT PRIMARY KEY IDENTITY,
-    FromAccountID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
-    ToAccountID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
-    Message NVARCHAR(500) NOT NULL,
-    SentTime DATETIME NOT NULL DEFAULT GETDATE()
-);
-
--- 14. Reminder
+-- Reminder
 CREATE TABLE Reminder (
     ReminderID INT PRIMARY KEY IDENTITY,
     VehicleID INT NOT NULL FOREIGN KEY REFERENCES Vehicle(VehicleID),
     ReminderType NVARCHAR(50) NOT NULL CHECK (ReminderType IN ('Maintenance','Payment')),
-    ReminderDate DATETIME NOT NULL,
-    Status NVARCHAR(20) NOT NULL CHECK (Status IN ('Sent','Pending'))
+    ReminderDate DATETIME2 NOT NULL,
+    Status NVARCHAR(20) NOT NULL CHECK (Status IN ('Sent','Pending')),
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
 );
-GO
 
--- ========================
--- 4. Trigger
--- ========================
-CREATE TRIGGER trg_Appointment_Deposit
-ON Appointment
-AFTER INSERT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    INSERT INTO PaymentTransaction (InvoiceID, Amount, Method, Status)
-    SELECT NULL, 100000, 'eWallet', 'Success'
-    FROM inserted;
-END;
-GO
--- Trigger khi thêm/sửa/xoá WorkOrderDetail
-CREATE TRIGGER trg_UpdateTotal_WorkOrderDetail
-ON WorkOrderDetail
-AFTER INSERT, UPDATE, DELETE
-AS
-BEGIN
-    SET NOCOUNT ON;
+-- Indexes (extra for performance)
+CREATE INDEX IX_Appointment_AccountID ON Appointment(AccountID);
+CREATE INDEX IX_Appointment_SlotID ON Appointment(SlotID);
+CREATE INDEX IX_Appointment_VehicleID ON Appointment(VehicleID);
 
-    UPDATE w
-    SET w.TotalAmount = ISNULL(d.ServiceTotal,0) + ISNULL(p.PartTotal,0)
-    FROM WorkOrder w
-    LEFT JOIN (
-        SELECT WorkOrderID, SUM(SubTotal) AS ServiceTotal
-        FROM WorkOrderDetail
-        GROUP BY WorkOrderID
-    ) d ON w.WorkOrderID = d.WorkOrderID
-    LEFT JOIN (
-        SELECT pu.WorkOrderID, SUM(pu.Quantity * pi.UnitPrice) AS PartTotal
-        FROM PartUsage pu
-        JOIN PartInventory pi ON pu.PartID = pi.PartID
-        GROUP BY pu.WorkOrderID
-    ) p ON w.WorkOrderID = p.WorkOrderID;
-END;
-GO
+CREATE INDEX IX_WorkOrder_AppointmentID ON WorkOrder(AppointmentID);
+CREATE INDEX IX_WorkOrder_TechnicianID ON WorkOrder(TechnicianID);
 
--- Trigger khi thêm/sửa/xoá PartUsage
-CREATE TRIGGER trg_UpdateTotal_PartUsage
-ON PartUsage
-AFTER INSERT, UPDATE, DELETE
-AS
-BEGIN
-    SET NOCOUNT ON;
+CREATE INDEX IX_Vehicle_AccountID ON Vehicle(AccountID);
 
-    UPDATE w
-    SET w.TotalAmount = ISNULL(d.ServiceTotal,0) + ISNULL(p.PartTotal,0)
-    FROM WorkOrder w
-    LEFT JOIN (
-        SELECT WorkOrderID, SUM(SubTotal) AS ServiceTotal
-        FROM WorkOrderDetail
-        GROUP BY WorkOrderID
-    ) d ON w.WorkOrderID = d.WorkOrderID
-    LEFT JOIN (
-        SELECT pu.WorkOrderID, SUM(pu.Quantity * pi.UnitPrice) AS PartTotal
-        FROM PartUsage pu
-        JOIN PartInventory pi ON pu.PartID = pi.PartID
-        GROUP BY pu.WorkOrderID
-    ) p ON w.WorkOrderID = p.WorkOrderID;
-END;
-GO
+CREATE INDEX IX_PaymentTransaction_Status ON PaymentTransaction(Status);
 
--- ========================
--- 5. Sample Data
--- ========================
-
--- Accounts
-INSERT INTO Account (Username, PasswordHash, Role, FullName, Email, Status)
-VALUES 
-('admin', '123456hash', 'Admin', N'Admin User', 'admin@example.com', 'Active'),
-('customer1', '123456hash', 'Customer', N'Nguyen Van A', 'customer1@example.com', 'Active'),
-('staff1', '123456hash', 'Staff', N'Le Van B', 'staff1@example.com', 'Active'),
-('tech1', '123456hash', 'Technician', N'Tran Van C', 'tech1@example.com', 'Active');
-
--- Model
-INSERT INTO Model (Brand, ModelName, EngineSpec)
-VALUES (N'Toyota', N'Camry', N'2.0L Petrol');
-
--- Vehicle (của customer1)
-INSERT INTO Vehicle (AccountID, ModelID, VIN, LicensePlate, Year)
-VALUES (2, 1, 'VIN123456789', '30A-12345', 2020);
-
--- Slot (của staff1)
-INSERT INTO Slot (StaffID, StartTime, EndTime, Status)
-VALUES (3, '2025-09-25 08:00', '2025-09-25 10:00', 'Free');
-
--- Appointment (trigger sẽ tạo PaymentTransaction 100k)
-INSERT INTO Appointment (AccountID, VehicleID, SlotID, ScheduledDate, Status)
-VALUES (2, 1, 1, GETDATE(), 'Pending');
-
--- Service
-INSERT INTO ServiceCatalog (ServiceName, Description, StandardCost)
-VALUES 
-(N'Bảo dưỡng định kỳ', N'Kiểm tra xe định kỳ', 500000),
-(N'Thay dầu máy', N'Dầu nhớt chính hãng', 300000);
-
--- Part
-INSERT INTO PartInventory (PartName, ModelID, StockQuantity, UnitPrice, MinStock)
-VALUES (N'Lọc dầu', 1, 50, 200000, 5);
-
--- Tạo WorkOrder mẫu
-INSERT INTO WorkOrder (AppointmentID, TechnicianID, ProgressStatus)
-VALUES (1, 4, 'Pending');
-
--- Thêm chi tiết dịch vụ
-INSERT INTO WorkOrderDetail (WorkOrderID, ServiceID, Quantity, UnitPrice)
-VALUES (1, 1, 1, 500000); -- Bảo dưỡng định kỳ
-
--- Thêm phụ tùng
-INSERT INTO PartUsage (WorkOrderID, PartID, Quantity)
-VALUES (1, 1, 2); -- 2 lọc dầu, đơn giá lấy từ PartInventory.UnitPrice = 200000
--- ========================
--- 6. Kiểm tra nhanh
--- ========================
-SELECT * FROM Account;
-SELECT * FROM Vehicle;
-SELECT * FROM Slot;
-SELECT * FROM Appointment;
-SELECT * FROM PaymentTransaction;
-SELECT * FROM WorkOrder;
+CREATE INDEX IX_Slot_StaffID ON Slot(StaffID);
