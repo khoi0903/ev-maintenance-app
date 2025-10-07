@@ -4,7 +4,7 @@ class AuthController {
   async registerCustomer(req, res) {
     try {
       const result = await authService.registerCustomer(req.body);
-      res.status(201).json(result);
+      res.json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -13,7 +13,7 @@ class AuthController {
   async createAccountByAdmin(req, res) {
     try {
       const result = await authService.createAccountByAdmin(req.body);
-      res.status(201).json(result);
+      res.json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

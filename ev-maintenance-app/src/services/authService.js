@@ -3,7 +3,6 @@ const jwt = require("jsonwebtoken");
 const accountRepository = require("../repositories/accountRepository");
 
 class AuthService {
-  // Khách hàng tự đăng ký
   async registerCustomer({ username, password, fullName, email }) {
     const existUser = await accountRepository.getAccountByUsername(username);
     if (existUser) throw new Error("Username already exists");
@@ -13,7 +12,7 @@ class AuthService {
     await accountRepository.createAccount({
       username,
       passwordHash,
-      role: "Customer", // luôn Customer
+      role: "Customer",
       fullName: fullName || "NoName",
       email: email || null,
     });
@@ -21,7 +20,6 @@ class AuthService {
     return { message: "Register successful as Customer" };
   }
 
-  // Admin tạo Staff/Technician/Admin
   async createAccountByAdmin({ username, password, role, fullName, email }) {
     if (!["Staff", "Technician", "Admin"].includes(role)) {
       throw new Error("Invalid role for admin creation");
@@ -43,12 +41,11 @@ class AuthService {
     return { message: `Account created successfully as ${role}` };
   }
 
-  // Đăng nhập
   async login({ username, password }) {
     const user = await accountRepository.getAccountByUsername(username);
     if (!user) throw new Error("Invalid username or password");
 
-    const match = await bcrypt.compare(password, user.PasswordHash.toString());
+    const match = await bcrypt.compare(password, user.PasswordHash);
     if (!match) throw new Error("Invalid username or password");
 
     const token = jwt.sign(

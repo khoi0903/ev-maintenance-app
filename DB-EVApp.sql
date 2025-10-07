@@ -1,6 +1,6 @@
-﻿-- ============================================
--- EVServiceCenterDB - Final Optimized Schema
--- ============================================
+﻿-- =============================================
+-- EVServiceCenterDB (Node.js friendly version)
+-- =============================================
 
 USE master;
 IF DB_ID('EVServiceCenterDB') IS NOT NULL
@@ -19,7 +19,7 @@ GO
 CREATE TABLE Account (
     AccountID INT PRIMARY KEY IDENTITY,
     Username NVARCHAR(50) UNIQUE NOT NULL,
-    PasswordHash VARBINARY(512) NOT NULL, -- bcrypt hash
+    PasswordHash NVARCHAR(255) NOT NULL, -- bcrypt string
     Role NVARCHAR(20) NOT NULL CHECK (Role IN ('Customer','Staff','Technician','Admin')),
     FullName NVARCHAR(100) NOT NULL,
     Phone NVARCHAR(20),
@@ -29,7 +29,6 @@ CREATE TABLE Account (
     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt DATETIME2 NULL
 );
-CREATE UNIQUE INDEX UX_Account_Email ON Account(Email) WHERE Email IS NOT NULL;
 
 -- Model
 CREATE TABLE Model (
@@ -50,7 +49,6 @@ CREATE TABLE Vehicle (
     LicensePlate NVARCHAR(50) UNIQUE NOT NULL,
     Year INT,
     LastServiceDate DATE,
-    Status NVARCHAR(20) NOT NULL DEFAULT 'Active' CHECK (Status IN ('Active','Inactive')),
     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt DATETIME2 NULL
 );
@@ -61,7 +59,7 @@ CREATE TABLE Slot (
     StaffID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
     StartTime DATETIME2 NOT NULL,
     EndTime DATETIME2 NOT NULL,
-    Capacity INT NOT NULL DEFAULT 4 CHECK (Capacity > 0),
+    Capacity INT NOT NULL DEFAULT 4,
     Status NVARCHAR(20) NOT NULL DEFAULT 'Free' CHECK (Status IN ('Free','Booked','Cancelled')),
     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt DATETIME2 NULL,
@@ -76,14 +74,21 @@ CREATE TABLE Appointment (
     SlotID INT NOT NULL FOREIGN KEY REFERENCES Slot(SlotID),
     ScheduledDate DATETIME2 NOT NULL,
     Status NVARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (Status IN ('Pending','Confirmed','Completed','Cancelled')),
-    TechnicianID INT NULL FOREIGN KEY REFERENCES Account(AccountID),
     Notes NVARCHAR(255),
     DepositAmount DECIMAL(18,2) NOT NULL DEFAULT 100000,
+    ConfirmedByStaffID INT NULL FOREIGN KEY REFERENCES Account(AccountID),
     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt DATETIME2 NULL
 );
 
--- ServiceCatalog
+-- AppointmentTechnician
+CREATE TABLE AppointmentTechnician (
+    AppointmentID INT NOT NULL FOREIGN KEY REFERENCES Appointment(AppointmentID),
+    TechnicianID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
+    PRIMARY KEY (AppointmentID, TechnicianID)
+);
+
+-- ServiceCatalog (danh mục dịch vụ chuẩn)
 CREATE TABLE ServiceCatalog (
     ServiceID INT PRIMARY KEY IDENTITY,
     ServiceName NVARCHAR(100) NOT NULL,
@@ -101,7 +106,42 @@ CREATE TABLE WorkOrder (
     StartTime DATETIME2,
     EndTime DATETIME2,
     ProgressStatus NVARCHAR(20) NOT NULL DEFAULT 'Pending' CHECK (ProgressStatus IN ('Pending','InProgress','Done')),
-    TotalAmount DECIMAL(18,2) NOT NULL DEFAULT 0,
+    TotalAmount DECIMAL(18,2) DEFAULT 0,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
+);
+
+-- WorkOrderDetail (chi tiết dịch vụ đã chọn)
+CREATE TABLE WorkOrderDetail (
+    WorkOrderDetailID INT PRIMARY KEY IDENTITY,
+    WorkOrderID INT NOT NULL FOREIGN KEY REFERENCES WorkOrder(WorkOrderID),
+    ServiceID INT NOT NULL FOREIGN KEY REFERENCES ServiceCatalog(ServiceID),
+    Quantity INT NOT NULL CHECK (Quantity > 0),
+    UnitPrice DECIMAL(18,2) NOT NULL DEFAULT 0,
+    SubTotal AS (Quantity * UnitPrice) PERSISTED
+);
+
+-- PartInventory
+CREATE TABLE PartInventory (
+    PartID INT PRIMARY KEY IDENTITY,
+    PartName NVARCHAR(100) NOT NULL,
+    ModelID INT NOT NULL FOREIGN KEY REFERENCES Model(ModelID),
+    StockQuantity INT NOT NULL DEFAULT 0,
+    UnitPrice DECIMAL(18,2) NOT NULL,
+    MinStock INT DEFAULT 0,
+    CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
+    UpdatedAt DATETIME2 NULL
+);
+
+-- PartUsage
+CREATE TABLE PartUsage (
+    UsageID INT PRIMARY KEY IDENTITY,
+    WorkOrderID INT NOT NULL FOREIGN KEY REFERENCES WorkOrder(WorkOrderID),
+    PartID INT NOT NULL FOREIGN KEY REFERENCES PartInventory(PartID),
+    Quantity INT NOT NULL CHECK (Quantity > 0),
+    UnitPrice DECIMAL(18,2) NULL,
+    SuggestedByTech BIT DEFAULT 1,
+    ApprovedByStaff BIT DEFAULT 0,
     CreatedAt DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME(),
     UpdatedAt DATETIME2 NULL
 );
@@ -133,6 +173,15 @@ CREATE TABLE PaymentTransaction (
     UpdatedAt DATETIME2 NULL
 );
 
+-- ChatMessage
+CREATE TABLE ChatMessage (
+    MessageID INT PRIMARY KEY IDENTITY,
+    FromAccountID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
+    ToAccountID INT NOT NULL FOREIGN KEY REFERENCES Account(AccountID),
+    Message NVARCHAR(500) NOT NULL,
+    SentTime DATETIME2 NOT NULL DEFAULT SYSUTCDATETIME()
+);
+
 -- Reminder
 CREATE TABLE Reminder (
     ReminderID INT PRIMARY KEY IDENTITY,
@@ -144,16 +193,9 @@ CREATE TABLE Reminder (
     UpdatedAt DATETIME2 NULL
 );
 
--- Indexes (extra for performance)
-CREATE INDEX IX_Appointment_AccountID ON Appointment(AccountID);
-CREATE INDEX IX_Appointment_SlotID ON Appointment(SlotID);
-CREATE INDEX IX_Appointment_VehicleID ON Appointment(VehicleID);
-
-CREATE INDEX IX_WorkOrder_AppointmentID ON WorkOrder(AppointmentID);
+-- Indexes bổ sung
 CREATE INDEX IX_WorkOrder_TechnicianID ON WorkOrder(TechnicianID);
-
-CREATE INDEX IX_Vehicle_AccountID ON Vehicle(AccountID);
-
+CREATE INDEX IX_Appointment_VehicleID ON Appointment(VehicleID);
 CREATE INDEX IX_PaymentTransaction_Status ON PaymentTransaction(Status);
-
 CREATE INDEX IX_Slot_StaffID ON Slot(StaffID);
+GO

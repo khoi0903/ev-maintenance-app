@@ -1,50 +1,23 @@
 require("dotenv").config();
 const express = require("express");
-const bodyParser = require("body-parser");
-
-const authController = require("./controllers/authController");
-const authMiddleware = require("./middlewares/authMiddleware");
-const roleMiddleware = require("./middlewares/roleMiddleware");
-const vehicleController = require("./controllers/vehicleController");
-const appointmentController = require("./controllers/appointmentController");
-
+const cors = require("cors");
 const app = express();
-app.use(bodyParser.json());
 
-// === Auth ===
-app.post("/auth/register", (req, res) => authController.registerCustomer(req, res));
-app.post("/auth/login", (req, res) => authController.login(req, res));
-app.post(
-  "/auth/admin-create",
-  authMiddleware,
-  roleMiddleware(["Admin"]),
-  (req, res) => authController.createAccountByAdmin(req, res)
-);
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-// === Vehicle ===
-app.post("/vehicles", authMiddleware, (req, res) => vehicleController.createVehicle(req, res));
-app.get("/vehicles/my", authMiddleware, (req, res) => vehicleController.getMyVehicles(req, res));
-app.put("/vehicles/:id", authMiddleware, (req, res) => vehicleController.updateVehicle(req, res));
-app.put("/vehicles/:id/deactivate", authMiddleware, (req, res) =>
-  vehicleController.deactivateVehicle(req, res)
-);
+// Routes
+app.use("/auth", require("./routes/authRoutes"));
+app.use("/account", require("./routes/accountRoutes"));
+app.use("/vehicle", require("./routes/vehicleRoutes"));
+app.use("/appointment", require("./routes/appointmentRoutes"));
 
-// === Appointment ===
-app.post("/appointments", authMiddleware, (req, res) =>
-  appointmentController.createAppointment(req, res)
-);
-app.get("/appointments/my", authMiddleware, (req, res) =>
-  appointmentController.getMyAppointments(req, res)
-);
-app.put(
-  "/appointments/:id/confirm",
-  authMiddleware,
-  roleMiddleware(["Staff"]),
-  (req, res) => appointmentController.confirmAppointment(req, res)
-);
-app.put("/appointments/:id/cancel", authMiddleware, (req, res) =>
-  appointmentController.cancelAppointment(req, res)
-);
+// Root test
+app.get("/", (req, res) => {
+  res.send("🚗 EV Service Center API is running...");
+});
 
+// Server start
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));

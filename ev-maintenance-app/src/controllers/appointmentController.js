@@ -1,40 +1,34 @@
-const appointmentRepository = require("../repositories/appointmentRepository");
+const appointmentService = require("../services/appointmentService");
 
 class AppointmentController {
   async createAppointment(req, res) {
     try {
-      const accountId = req.user.accountId;
-      const { vehicleId, slotId, technicianId, notes } = req.body;
-
-      const appointment = await appointmentRepository.createAppointment({
-        accountId,
-        vehicleId,
-        slotId,
-        technicianId: technicianId || null,
-        notes: notes || null,
-      });
-
-      res.status(201).json(appointment);
+      const result = await appointmentService.createAppointment(req.user.accountId, req.body);
+      res.json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
   }
 
-  async getMyAppointments(req, res) {
+  async getAppointments(req, res) {
     try {
-      const accountId = req.user.accountId;
-      const appointments = await appointmentRepository.getAppointmentsByAccount(accountId);
+      const appointments = await appointmentService.getAppointmentsByAccount(req.user.accountId);
       res.json(appointments);
     } catch (err) {
-      res.status(500).json({ error: err.message });
+      res.status(400).json({ error: err.message });
     }
   }
 
   async confirmAppointment(req, res) {
     try {
-      const staffId = req.user.accountId;
-      await appointmentRepository.confirmAppointment(req.params.id, staffId);
-      res.json({ message: "Appointment confirmed by staff" });
+      const { appointmentId } = req.params;
+      const { technicianId } = req.body;
+      const result = await appointmentService.confirmAppointment(
+        appointmentId,
+        req.user.accountId, // staff xác nhận
+        technicianId
+      );
+      res.json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }
@@ -42,8 +36,9 @@ class AppointmentController {
 
   async cancelAppointment(req, res) {
     try {
-      await appointmentRepository.cancelAppointment(req.params.id);
-      res.json({ message: "Appointment cancelled" });
+      const { appointmentId } = req.params;
+      const result = await appointmentService.cancelAppointment(appointmentId);
+      res.json(result);
     } catch (err) {
       res.status(400).json({ error: err.message });
     }

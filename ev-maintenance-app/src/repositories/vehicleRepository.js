@@ -1,14 +1,14 @@
-const pool = require("../db");
+const { sql, poolPromise } = require("../db");
 
 class VehicleRepository {
   async createVehicle({ accountId, modelId, vin, licensePlate, year }) {
-    const result = await pool
-      .request()
-      .input("accountId", accountId)
-      .input("modelId", modelId)
-      .input("vin", vin)
-      .input("licensePlate", licensePlate)
-      .input("year", year)
+    const pool = await poolPromise;
+    const result = await pool.request()
+      .input("accountId", sql.Int, accountId)
+      .input("modelId", sql.Int, modelId)
+      .input("vin", sql.NVarChar, vin)
+      .input("licensePlate", sql.NVarChar, licensePlate)
+      .input("year", sql.Int, year)
       .query(`
         INSERT INTO Vehicle (AccountID, ModelID, VIN, LicensePlate, Year)
         OUTPUT INSERTED.*
@@ -17,44 +17,50 @@ class VehicleRepository {
     return result.recordset[0];
   }
 
-  async getVehiclesByAccountId(accountId) {
-    const result = await pool
-      .request()
-      .input("accountId", accountId)
-      .query("SELECT * FROM Vehicle WHERE AccountID = @accountId AND Status = 'Active'");
+  async getById(vehicleId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+      .input("vehicleId", sql.Int, vehicleId)
+      .query(`SELECT * FROM Vehicle WHERE VehicleID = @vehicleId`);
+    return result.recordset[0];
+  }
+
+  async getVehiclesByAccount(accountId) {
+    const pool = await poolPromise;
+    const result = await pool.request()
+      .input("accountId", sql.Int, accountId)
+      .query(`SELECT * FROM Vehicle WHERE AccountID = @accountId AND Status = 'Active'`);
     return result.recordset;
   }
 
-  async updateVehicle(id, { modelId, vin, licensePlate, year }) {
-    await pool
-      .request()
-      .input("id", id)
-      .input("modelId", modelId)
-      .input("vin", vin)
-      .input("licensePlate", licensePlate)
-      .input("year", year)
-      .input("updatedAt", new Date())
+  async updateVehicle(vehicleId, { modelId, licensePlate, year }) {
+    const pool = await poolPromise;
+    await pool.request()
+      .input("vehicleId", sql.Int, vehicleId)
+      .input("modelId", sql.Int, modelId)
+      .input("licensePlate", sql.NVarChar, licensePlate)
+      .input("year", sql.Int, year)
+      .input("updatedAt", sql.DateTime2, new Date())
       .query(`
         UPDATE Vehicle
         SET ModelID = @modelId,
-            VIN = @vin,
             LicensePlate = @licensePlate,
             Year = @year,
             UpdatedAt = @updatedAt
-        WHERE VehicleID = @id
+        WHERE VehicleID = @vehicleId
       `);
   }
 
-  async deactivateVehicle(id) {
-    await pool
-      .request()
-      .input("id", id)
-      .input("updatedAt", new Date())
+  async deactivateVehicle(vehicleId) {
+    const pool = await poolPromise;
+    await pool.request()
+      .input("vehicleId", sql.Int, vehicleId)
+      .input("updatedAt", sql.DateTime2, new Date())
       .query(`
         UPDATE Vehicle
         SET Status = 'Inactive',
             UpdatedAt = @updatedAt
-        WHERE VehicleID = @id
+        WHERE VehicleID = @vehicleId
       `);
   }
 }
