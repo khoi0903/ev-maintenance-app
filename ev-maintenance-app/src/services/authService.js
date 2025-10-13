@@ -1,60 +1,39 @@
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const bcrypt = require("bcrypt");
 const accountRepository = require("../repositories/accountRepository");
 
 class AuthService {
-  async registerCustomer({ username, password, fullName, email }) {
-    const existUser = await accountRepository.getAccountByUsername(username);
-    if (existUser) throw new Error("Username already exists");
+  async register(data) {
+    const { username, password, fullName, email, phone, address } = data;
+    const existing = await accountRepository.getByUsername(username);
+    if (existing) throw new Error("Tên đăng nhập đã tồn tại");
 
     const passwordHash = await bcrypt.hash(password, 10);
-
-    await accountRepository.createAccount({
-      username,
-      passwordHash,
-      role: "Customer",
-      fullName: fullName || "NoName",
-      email: email || null,
+    await accountRepository.create({
+      Username: username,
+      PasswordHash: passwordHash,
+      FullName: fullName,
+      Email: email,
+      Phone: phone,
+      Address: address,
+      Role: "Customer",
     });
-
-    return { message: "Register successful as Customer" };
+    return { message: "Đăng ký thành công, vui lòng đăng nhập" };
   }
 
-  async createAccountByAdmin({ username, password, role, fullName, email }) {
-    if (!["Staff", "Technician", "Admin"].includes(role)) {
-      throw new Error("Invalid role for admin creation");
-    }
+  async login(username, password) {
+    const account = await accountRepository.getByUsername(username);
+    if (!account) throw new Error("Sai tên đăng nhập hoặc mật khẩu");
 
-    const existUser = await accountRepository.getAccountByUsername(username);
-    if (existUser) throw new Error("Username already exists");
-
-    const passwordHash = await bcrypt.hash(password, 10);
-
-    await accountRepository.createAccount({
-      username,
-      passwordHash,
-      role,
-      fullName: fullName || "NoName",
-      email: email || null,
-    });
-
-    return { message: `Account created successfully as ${role}` };
-  }
-
-  async login({ username, password }) {
-    const user = await accountRepository.getAccountByUsername(username);
-    if (!user) throw new Error("Invalid username or password");
-
-    const match = await bcrypt.compare(password, user.PasswordHash);
-    if (!match) throw new Error("Invalid username or password");
+    const valid = await bcrypt.compare(password, account.PasswordHash);
+    if (!valid) throw new Error("Sai tên đăng nhập hoặc mật khẩu");
 
     const token = jwt.sign(
-      { accountId: user.AccountID, role: user.Role },
+      { id: account.AccountID, role: account.Role, name: account.FullName },
       process.env.JWT_SECRET,
       { expiresIn: "1d" }
     );
-
-    return { token, accountId: user.AccountID, role: user.Role };
+    return { message: "Đăng nhập thành công", token, user: account };
   }
 }
 
