@@ -1,22 +1,23 @@
 const vehicleRepository = require("../repositories/vehicleRepository");
 
 class VehicleService {
-  async createVehicle(accountId, data) {
-    return await vehicleRepository.createVehicle({ accountId, ...data });
+  async getAllByAccount(accountId) {
+    return await vehicleRepository.getAllByAccount(accountId);
   }
 
-  async getVehiclesByAccount(accountId) {
-    return await vehicleRepository.getVehiclesByAccount(accountId);
+  async createVehicle(data) {
+    await vehicleRepository.create(data);
+    return { message: "Thêm xe thành công" };
   }
 
   async updateVehicle(vehicleId, data) {
-    await vehicleRepository.updateVehicle(vehicleId, data);
-    return { message: "Vehicle updated successfully" };
+    await vehicleRepository.update(vehicleId, data);
+    return { message: "Cập nhật xe thành công" };
   }
 
-  async deactivateVehicle(vehicleId) {
-    await vehicleRepository.deactivateVehicle(vehicleId);
-    return { message: "Vehicle deactivated" };
+  async deleteVehicle(vehicleId) {
+    await vehicleRepository.delete(vehicleId);
+    return { message: "Xóa xe thành công" };
   }
 }
 

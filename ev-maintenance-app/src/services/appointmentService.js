@@ -1,34 +1,23 @@
 const appointmentRepository = require("../repositories/appointmentRepository");
 
 class AppointmentService {
-  async createAppointment(accountId, { vehicleId, slotId, scheduledDate, notes }) {
-    // Kiểm tra slot còn trống
-    const count = await appointmentRepository.countActiveBySlot(slotId);
-    if (count >= 5) throw new Error("Slot is full"); // giả sử 1 slot max 5
-
-    return await appointmentRepository.createAppointment({
-      accountId,
-      vehicleId,
-      slotId,
-      scheduledDate,
-      notes,
-    });
+  async getAllByAccount(accountId) {
+    return await appointmentRepository.getAllByAccount(accountId);
   }
 
-  async getAppointmentsByAccount(accountId) {
-    return await appointmentRepository.getAppointmentsByAccount(accountId);
+  async createAppointment(data) {
+    await appointmentRepository.create(data);
+    return { message: "Đặt lịch thành công" };
   }
 
-  async confirmAppointment(appointmentId, staffId, technicianId = null) {
-    return await appointmentRepository.confirmAppointment(
-      appointmentId,
-      staffId,
-      technicianId
-    );
+  async confirmAppointment(appointmentId, staffId) {
+    await appointmentRepository.confirm(appointmentId, staffId);
+    return { message: "Lịch hẹn đã được xác nhận" };
   }
 
-  async cancelAppointment(id) {
-    return await appointmentRepository.cancelAppointment(id);
+  async cancelAppointment(appointmentId) {
+    await appointmentRepository.cancel(appointmentId);
+    return { message: "Đã hủy lịch hẹn" };
   }
 }
 
