@@ -3,21 +3,22 @@ const express = require("express");
 const cors = require("cors");
 const app = express();
 
-// Middleware
 app.use(cors());
 app.use(express.json());
 
-// Routes
+// ROUTES
 app.use("/auth", require("./routes/authRoutes"));
 app.use("/account", require("./routes/accountRoutes"));
 app.use("/vehicle", require("./routes/vehicleRoutes"));
 app.use("/appointment", require("./routes/appointmentRoutes"));
+app.use("/workorder", require("./routes/workOrderRoutes"));
+app.use("/invoice", require("./routes/invoiceRoutes"));
+app.use("/payment", require("./routes/paymentRoutes"));
+app.use("/reminder", require("./routes/reminderRoutes"));
+app.use("/report", require("./routes/reportRoutes"));
+app.use("/service", require("./routes/serviceCatalogRoutes"));
 
-// Root test
-app.get("/", (req, res) => {
-  res.send("🚗 EV Service Center API is running...");
-});
+app.get("/", (req, res) => res.send("🚗 EV Service Center API is running..."));
 
-// Server start
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => console.log(`✅ Server running on port ${PORT}`));
