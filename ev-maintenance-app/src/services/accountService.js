@@ -1,18 +1,23 @@
 const accountRepository = require("../repositories/accountRepository");
+const bcrypt = require("bcrypt");
 
 class AccountService {
-  async getAccountById(id) {
-    return await accountRepository.getAccountById(id);
+  async getProfile(accountId) {
+    return await accountRepository.getById(accountId);
   }
 
-  async updateAccount(id, data) {
-    await accountRepository.updateAccount(id, data);
-    return { message: "Account updated successfully" };
+  async updateProfile(accountId, data) {
+    await accountRepository.update(accountId, data);
+    return { message: "Cập nhật thông tin tài khoản thành công" };
   }
 
-  async deactivateAccount(id) {
-    await accountRepository.deactivateAccount(id);
-    return { message: "Account deactivated" };
+  async deactivateAccount(accountId) {
+    await accountRepository.deactivate(accountId);
+    return { message: "Tài khoản đã được vô hiệu hóa" };
+  }
+
+  async getAll() {
+    return await accountRepository.getAll();
   }
 }
 

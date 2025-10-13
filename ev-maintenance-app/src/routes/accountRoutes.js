@@ -3,7 +3,7 @@ const router = express.Router();
 const accountController = require("../controllers/accountController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 
-// 🔹 Xem profile
+// 🔹 Lấy thông tin cá nhân
 router.get("/me", verifyToken, accountController.getProfile);
 
 // 🔹 Cập nhật thông tin cá nhân

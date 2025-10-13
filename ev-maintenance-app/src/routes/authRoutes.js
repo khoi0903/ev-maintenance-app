@@ -1,16 +1,11 @@
 const express = require("express");
 const router = express.Router();
 const authController = require("../controllers/authController");
-const { verifyToken } = require("../middlewares/authMiddleware");
-const { isAdmin } = require("../middlewares/roleMiddleware");
 
-// 🔹 Customer tự đăng ký
-router.post("/register", authController.registerCustomer);
+// 🔹 Đăng ký (mặc định là Customer)
+router.post("/register", authController.register);
 
-// 🔹 Admin tạo tài khoản Staff/Technician/Admin
-router.post("/create", verifyToken, isAdmin, authController.createAccountByAdmin);
-
-// 🔹 Login chung
+// 🔹 Đăng nhập
 router.post("/login", authController.login);
 
 module.exports = router;
