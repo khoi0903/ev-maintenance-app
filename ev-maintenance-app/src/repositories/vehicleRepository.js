@@ -1,66 +1,76 @@
-const { sql, poolPromise } = require("../db");
+// src/repositories/vehicleRepository.js
+// Repository quản lý Vehicle (full CRUD + soft-deactivate)
+// Sử dụng poolPromise
+
+const { poolPromise, sql } = require("../db");
 
 class VehicleRepository {
-  async createVehicle({ accountId, modelId, vin, licensePlate, year }) {
+  // Lấy tất cả xe theo AccountID (chỉ Active)
+  async getAllByAccount(accountId) {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input("accountId", sql.Int, accountId)
-      .input("modelId", sql.Int, modelId)
-      .input("vin", sql.NVarChar, vin)
-      .input("licensePlate", sql.NVarChar, licensePlate)
-      .input("year", sql.Int, year)
-      .query(`
-        INSERT INTO Vehicle (AccountID, ModelID, VIN, LicensePlate, Year)
-        OUTPUT INSERTED.*
-        VALUES (@accountId, @modelId, @vin, @licensePlate, @year)
-      `);
-    return result.recordset[0];
+    const r = await pool.request()
+      .input("AccountID", sql.Int, accountId)
+      .query("SELECT * FROM Vehicle WHERE AccountID = @AccountID");
+    return r.recordset;
   }
 
+  // Lấy chi tiết 1 xe theo ID
   async getById(vehicleId) {
     const pool = await poolPromise;
-    const result = await pool.request()
-      .input("vehicleId", sql.Int, vehicleId)
-      .query(`SELECT * FROM Vehicle WHERE VehicleID = @vehicleId`);
-    return result.recordset[0];
+    const r = await pool.request()
+      .input("VehicleID", sql.Int, vehicleId)
+      .query("SELECT * FROM Vehicle WHERE VehicleID = @VehicleID");
+    return r.recordset[0];
   }
 
-  async getVehiclesByAccount(accountId) {
-    const pool = await poolPromise;
-    const result = await pool.request()
-      .input("accountId", sql.Int, accountId)
-      .query(`SELECT * FROM Vehicle WHERE AccountID = @accountId AND Status = 'Active'`);
-    return result.recordset;
-  }
-
-  async updateVehicle(vehicleId, { modelId, licensePlate, year }) {
+  // Tạo xe mới
+  async createVehicle({ accountId, modelId, vin, licensePlate, year }) {
     const pool = await poolPromise;
     await pool.request()
-      .input("vehicleId", sql.Int, vehicleId)
-      .input("modelId", sql.Int, modelId)
-      .input("licensePlate", sql.NVarChar, licensePlate)
-      .input("year", sql.Int, year)
+      .input("AccountID", sql.Int, accountId)
+      .input("ModelID", sql.Int, modelId)
+      .input("VIN", sql.NVarChar(100), vin)
+      .input("LicensePlate", sql.NVarChar(50), licensePlate)
+      .input("Year", sql.Int, year)
+      .query(`
+        INSERT INTO Vehicle (AccountID, ModelID, VIN, LicensePlate, Year, CreatedDate)
+        VALUES (@AccountID, @ModelID, @VIN, @LicensePlate, @Year, SYSUTCDATETIME())
+      `);
+  }
+
+  // Cập nhật xe
+  async updateVehicle(vehicleId, { modelId, vin, licensePlate, year }) {
+    const pool = await poolPromise;
+    await pool.request()
+      .input("VehicleID", sql.Int, vehicleId)
+      .input("ModelID", sql.Int, modelId)
+      .input("VIN", sql.NVarChar(100), vin)
+      .input("LicensePlate", sql.NVarChar(50), licensePlate)
+      .input("Year", sql.Int, year)
       .input("updatedAt", sql.DateTime2, new Date())
       .query(`
         UPDATE Vehicle
-        SET ModelID = @modelId,
-            LicensePlate = @licensePlate,
-            Year = @year,
+        SET ModelID = @ModelID,
+            VIN = @VIN,
+            LicensePlate = @LicensePlate,
+            Year = @Year,
             UpdatedAt = @updatedAt
-        WHERE VehicleID = @vehicleId
+        WHERE VehicleID = @VehicleID
       `);
   }
 
+  // Vô hiệu hóa (soft delete)
   async deactivateVehicle(vehicleId) {
     const pool = await poolPromise;
     await pool.request()
-      .input("vehicleId", sql.Int, vehicleId)
+      .input("VehicleID", sql.Int, vehicleId)
       .input("updatedAt", sql.DateTime2, new Date())
       .query(`
         UPDATE Vehicle
-        SET Status = 'Inactive',
-            UpdatedAt = @updatedAt
-        WHERE VehicleID = @vehicleId
+        SET UpdatedAt = @updatedAt
+        WHERE VehicleID = @VehicleID;
+        -- nếu bạn muốn thêm cột Status cho vehicle, bỏ comment và sửa
+        -- UPDATE Vehicle SET Status='Inactive', UpdatedAt=@updatedAt WHERE VehicleID=@VehicleID
       `);
   }
 }

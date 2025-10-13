@@ -3,16 +3,16 @@ const router = express.Router();
 const vehicleController = require("../controllers/vehicleController");
 const { verifyToken } = require("../middlewares/authMiddleware");
 
-// 🔹 Lấy danh sách xe của user
-router.get("/", verifyToken, vehicleController.getVehicles);
+// 🔹 Lấy tất cả xe của người dùng
+router.get("/", verifyToken, vehicleController.getAll);
 
 // 🔹 Thêm xe mới
-router.post("/", verifyToken, vehicleController.createVehicle);
+router.post("/", verifyToken, vehicleController.create);
 
 // 🔹 Cập nhật xe
-router.put("/:id", verifyToken, vehicleController.updateVehicle);
+router.put("/:id", verifyToken, vehicleController.update);
 
-// 🔹 Vô hiệu hóa xe
-router.put("/:id/deactivate", verifyToken, vehicleController.deactivateVehicle);
+// 🔹 Xóa (vô hiệu hóa) xe
+router.delete("/:id", verifyToken, vehicleController.delete);
 
 module.exports = router;

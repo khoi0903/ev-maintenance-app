@@ -2,18 +2,18 @@ const express = require("express");
 const router = express.Router();
 const appointmentController = require("../controllers/appointmentController");
 const { verifyToken } = require("../middlewares/authMiddleware");
-const { isStaff } = require("../middlewares/roleMiddleware");
+const roleMiddleware = require("../middlewares/roleMiddleware");
 
-// 🔹 Khách hàng đặt lịch
-router.post("/", verifyToken, appointmentController.createAppointment);
+// 🔹 Lấy danh sách lịch hẹn của người dùng
+router.get("/", verifyToken, appointmentController.getAll);
 
-// 🔹 Xem lịch hẹn của mình
-router.get("/", verifyToken, appointmentController.getAppointments);
+// 🔹 Tạo lịch hẹn mới
+router.post("/", verifyToken, appointmentController.create);
 
-// 🔹 Staff xác nhận (và gán technician)
-router.put("/:appointmentId/confirm", verifyToken, isStaff, appointmentController.confirmAppointment);
+// 🔹 Nhân viên xác nhận lịch hẹn
+router.put("/:id/confirm", verifyToken, roleMiddleware(["Staff", "Admin"]), appointmentController.confirm);
 
-// 🔹 Hủy lịch
-router.put("/:appointmentId/cancel", verifyToken, appointmentController.cancelAppointment);
+// 🔹 Hủy lịch hẹn
+router.put("/:id/cancel", verifyToken, appointmentController.cancel);
 
 module.exports = router;
