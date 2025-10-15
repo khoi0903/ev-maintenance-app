@@ -72,7 +72,7 @@ class WorkOrderRepository {
         UPDATE WorkOrder SET TotalAmount = @TotalAmount, UpdatedAt = @updatedAt WHERE WorkOrderID = @WorkOrderID
       `);
   }
-}
+
 
 
   async getByAppointment(appointmentId) {
