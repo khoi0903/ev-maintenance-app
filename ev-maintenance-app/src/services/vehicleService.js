@@ -6,18 +6,18 @@ class VehicleService {
   }
 
   async createVehicle(data) {
-    await vehicleRepository.create(data);
+    await vehicleRepository.createVehicle(data);
     return { message: "Thêm xe thành công" };
   }
 
   async updateVehicle(vehicleId, data) {
-    await vehicleRepository.update(vehicleId, data);
+    await vehicleRepository.updateVehicle(vehicleId, data);
     return { message: "Cập nhật xe thành công" };
   }
 
   async deleteVehicle(vehicleId) {
-    await vehicleRepository.delete(vehicleId);
-    return { message: "Xóa xe thành công" };
+    await vehicleRepository.deleteVehicle(vehicleId);
+    return { message: "Xóa (vô hiệu hóa) xe thành công" };
   }
 }
 

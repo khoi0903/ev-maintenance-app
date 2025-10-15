@@ -2,12 +2,12 @@ const workOrderRepository = require("../repositories/workOrderRepository");
 
 class WorkOrderService {
   async create(data) {
-    const result = await workOrderRepository.create(data);
+    const result = await workOrderRepository.createWorkOrder(data);
     return { message: "Tạo phiếu sửa chữa thành công", workOrder: result };
   }
 
   async updateStatus(workOrderId, status) {
-    await workOrderRepository.updateStatus(workOrderId, status);
+    await workOrderRepository.updateProgress(workOrderId, status);
     return { message: "Cập nhật trạng thái phiếu sửa chữa thành công" };
   }
 

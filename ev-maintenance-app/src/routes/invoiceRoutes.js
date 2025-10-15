@@ -2,26 +2,18 @@ const express = require("express");
 const router = express.Router();
 const invoiceController = require("../controllers/invoiceController");
 const { verifyToken } = require("../middlewares/authMiddleware");
-const roleMiddleware = require("../middlewares/roleMiddleware");
+const role = require("../middlewares/roleMiddleware");
 
-// 🔹 Tạo hóa đơn
-router.post("/", invoiceController.create);
+// Tạo hóa đơn (Staff/Admin)
+router.post("/", verifyToken, role(["Staff","Admin"]), invoiceController.create);
 
-// 🔹 Lấy hóa đơn theo WorkOrder
-router.get("/workorder/:workOrderId", invoiceController.getByWorkOrder);
+// Lấy hóa đơn theo WorkOrder (đã xác thực)
+router.get("/workorder/:workOrderId", verifyToken, invoiceController.getByWorkOrder);
 
-// 🔹 Cập nhật trạng thái đã thanh toán
-router.put("/markpaid/:id", invoiceController.markAsPaid);
+// Đánh dấu đã thanh toán (Staff/Admin)
+router.put("/markpaid/:id", verifyToken, role(["Staff","Admin"]), invoiceController.markAsPaid);
 
-// ✅ Xuất PDF hóa đơn có QR thanh toán thật
-router.get("/export/:invoiceId", invoiceController.exportInvoice);
-
-module.exports = router;
-
-
-
-
-
-
+// Xuất PDF (đã xác thực)
+router.get("/export/:invoiceId", verifyToken, invoiceController.exportInvoice);
 
 module.exports = router;

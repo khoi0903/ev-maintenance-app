@@ -1,11 +1,7 @@
-// src/repositories/accountRepository.js
-// Repository quản lý bảng Account
-// Sử dụng poolPromise (đã chuẩn hoá)
-
+// src/repositories/accountRepository.js (patched)
 const { poolPromise, sql } = require("../db");
 
 class AccountRepository {
-  // Lấy account theo username (chỉ account Active)
   async getAccountByUsername(username) {
     const pool = await poolPromise;
     const r = await pool.request()
@@ -14,7 +10,6 @@ class AccountRepository {
     return r.recordset[0];
   }
 
-  // Lấy account theo id (bỏ trạng thái filter để admin có thể truy vấn)
   async getAccountById(id) {
     const pool = await poolPromise;
     const r = await pool.request()
@@ -23,12 +18,17 @@ class AccountRepository {
     return r.recordset[0];
   }
 
-  // Tạo account mới (passwordHash có thể là chuỗi bcrypt hoặc varbinary - phù hợp với DB của bạn)
+  async getAll() {
+    const pool = await poolPromise;
+    const r = await pool.request().query("SELECT * FROM Account ORDER BY CreatedAt DESC");
+    return r.recordset;
+  }
+
   async createAccount({ username, passwordHash, role, fullName, email, phone, address }) {
     const pool = await poolPromise;
     await pool.request()
       .input("username", sql.NVarChar(50), username)
-      .input("passwordHash", sql.NVarChar(sql.MAX), passwordHash) // nếu DB là VARBINARY, sửa type tương ứng
+      .input("passwordHash", sql.NVarChar(sql.MAX), passwordHash)
       .input("role", sql.NVarChar(20), role)
       .input("fullName", sql.NVarChar(100), fullName)
       .input("email", sql.NVarChar(100), email || null)
@@ -40,28 +40,45 @@ class AccountRepository {
       `);
   }
 
-  // Cập nhật profile (không đổi mật khẩu ở đây)
-  async updateAccount(id, { fullName, email, phone, address }) {
+  // ✅ Partial update
+  async updateAccount(accountId, data) {
     const pool = await poolPromise;
-    await pool.request()
-      .input("id", sql.Int, id)
-      .input("fullName", sql.NVarChar(100), fullName)
-      .input("email", sql.NVarChar(100), email)
-      .input("phone", sql.NVarChar(20), phone)
-      .input("address", sql.NVarChar(200), address)
-      .input("updatedAt", sql.DateTime2, new Date())
-      .query(`
-        UPDATE Account
-        SET FullName = @fullName,
-            Email = @email,
-            Phone = @phone,
-            Address = @address,
-            UpdatedAt = @updatedAt
-        WHERE AccountID = @id
-      `);
+    const req = pool.request().input("AccountID", sql.Int, accountId);
+    const fields = [];
+
+    const current = await this.getAccountById(accountId);
+    if (!current) throw new Error("Không tìm thấy tài khoản");
+
+    if (data.fullName !== undefined) {
+      req.input("FullName", sql.NVarChar(100), data.fullName);
+      fields.push("FullName = @FullName");
+    }
+    if (data.email !== undefined) {
+      req.input("Email", sql.NVarChar(100), data.email);
+      fields.push("Email = @Email");
+    }
+    if (data.phone !== undefined) {
+      req.input("Phone", sql.NVarChar(20), data.phone);
+      fields.push("Phone = @Phone");
+    }
+    if (data.address !== undefined) {
+      req.input("Address", sql.NVarChar(200), data.address);
+      fields.push("Address = @Address");
+    }
+    if (data.gender !== undefined) {
+      req.input("Gender", sql.NVarChar(10), data.gender);
+      fields.push("Gender = @Gender");
+    }
+
+    if (fields.length === 0) return;
+
+    req.input("updatedAt", sql.DateTime2, new Date());
+    fields.push("UpdatedAt = @updatedAt");
+
+    const q = `UPDATE Account SET ${fields.join(", ")} WHERE AccountID = @AccountID`;
+    await req.query(q);
   }
 
-  // Vô hiệu hóa tài khoản thay vì xóa
   async deactivateAccount(id) {
     const pool = await poolPromise;
     await pool.request()

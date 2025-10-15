@@ -11,7 +11,7 @@ class ReminderService {
   }
 
   async getByVehicle(vehicleId) {
-    return await reminderRepository.getByVehicle(vehicleId);
+    return await reminderRepository.getByVehicleId  (vehicleId);
   }
 }
 

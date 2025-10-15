@@ -1,9 +1,9 @@
 ﻿-- =============================================
--- EVServiceCenterDB (Node.js friendly version)
+-- EVServiceCenterDB 
 -- =============================================
 
 USE master;
-IF DB_ID('EVServiceCenterDB') IS NOT NULL
+IF DB_ID('EVServiceCenterDB') 
 BEGIN
     ALTER DATABASE EVServiceCenterDB SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
     DROP DATABASE EVServiceCenterDB;
@@ -198,4 +198,83 @@ CREATE INDEX IX_WorkOrder_TechnicianID ON WorkOrder(TechnicianID);
 CREATE INDEX IX_Appointment_VehicleID ON Appointment(VehicleID);
 CREATE INDEX IX_PaymentTransaction_Status ON PaymentTransaction(Status);
 CREATE INDEX IX_Slot_StaffID ON Slot(StaffID);
+GO
+-- REMINDER TRIGGERS
+-- ==========================================
+
+-- Khi tạo Appointment mới → tự thêm Reminder bảo dưỡng
+CREATE OR ALTER TRIGGER trg_AutoCreateReminder_OnAppointment
+ON Appointment
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Reminder (VehicleID, ReminderType, ReminderDate, Status)
+    SELECT 
+        i.VehicleID,
+        'Maintenance',
+        DATEADD(DAY, -1, i.ScheduledDate), -- nhắc 1 ngày trước bảo dưỡng
+        'Pending'
+    FROM inserted i;
+END;
+GO
+
+-- Khi tạo Invoice chưa thanh toán → tự thêm Reminder thanh toán
+CREATE OR ALTER TRIGGER trg_AutoCreateReminder_OnInvoice
+ON Invoice
+AFTER INSERT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    INSERT INTO Reminder (VehicleID, ReminderType, ReminderDate, Status)
+    SELECT 
+        v.VehicleID,
+        'Payment',
+        DATEADD(DAY, 1, i.CreatedAt),  -- nhắc 1 ngày sau khi tạo hóa đơn
+        'Pending'
+    FROM inserted i
+    JOIN Appointment a ON i.AppointmentID = a.AppointmentID
+    JOIN Vehicle v ON a.VehicleID = v.VehicleID
+    WHERE i.PaymentStatus = 'Unpaid';
+END;
+GO
+-- ==========================================
+-- REPORTING VIEWS
+-- ==========================================
+
+-- 1. Tổng hợp doanh thu theo tháng
+CREATE OR ALTER VIEW vw_MonthlyRevenue AS
+SELECT 
+    FORMAT(i.CreatedAt, 'yyyy-MM') AS Month,
+    SUM(i.TotalAmount) AS TotalRevenue,
+    COUNT(i.InvoiceID) AS InvoiceCount
+FROM Invoice i
+WHERE i.PaymentStatus = 'Paid'
+GROUP BY FORMAT(i.CreatedAt, 'yyyy-MM');
+
+-- 2. Doanh thu theo dịch vụ
+CREATE OR ALTER VIEW vw_ServiceRevenue AS
+SELECT 
+    s.ServiceName,
+    SUM(wd.Quantity * wd.UnitPrice) AS TotalServiceRevenue,
+    COUNT(DISTINCT wd.WorkOrderID) AS WorkOrders
+FROM WorkOrderDetail wd
+JOIN ServiceCatalog s ON wd.ServiceID = s.ServiceID
+GROUP BY s.ServiceName;
+
+-- 3. Báo cáo lịch bảo dưỡng sắp tới
+CREATE OR ALTER VIEW vw_UpcomingMaintenance AS
+SELECT 
+    a.AppointmentID,
+    c.FullName AS CustomerName,
+    v.LicensePlate,
+    a.ScheduledDate,
+    a.Status
+FROM Appointment a
+JOIN Account c ON a.AccountID = c.AccountID
+JOIN Vehicle v ON a.VehicleID = v.VehicleID
+WHERE a.ScheduledDate >= GETUTCDATE()
+ORDER BY a.ScheduledDate ASC;
 GO

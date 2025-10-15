@@ -3,16 +3,16 @@ const bcrypt = require("bcrypt");
 
 class AccountService {
   async getProfile(accountId) {
-    return await accountRepository.getById(accountId);
+    return await accountRepository.getAccountById(accountId);
   }
 
   async updateProfile(accountId, data) {
-    await accountRepository.update(accountId, data);
+    await accountRepository.updateAccount(accountId, data);
     return { message: "Cập nhật thông tin tài khoản thành công" };
   }
 
   async deactivateAccount(accountId) {
-    await accountRepository.deactivate(accountId);
+    await accountRepository.deactivateAccount(accountId);
     return { message: "Tài khoản đã được vô hiệu hóa" };
   }
 

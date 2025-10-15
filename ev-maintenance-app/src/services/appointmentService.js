@@ -6,17 +6,17 @@ class AppointmentService {
   }
 
   async createAppointment(data) {
-    await appointmentRepository.create(data);
+    await appointmentRepository.createAppointment(data);
     return { message: "Đặt lịch thành công" };
   }
 
   async confirmAppointment(appointmentId, staffId) {
-    await appointmentRepository.confirm(appointmentId, staffId);
+    await appointmentRepository.confirmAppointment(appointmentId, staffId);
     return { message: "Lịch hẹn đã được xác nhận" };
   }
 
   async cancelAppointment(appointmentId) {
-    await appointmentRepository.cancel(appointmentId);
+    await appointmentRepository.cancelAppointment(appointmentId);
     return { message: "Đã hủy lịch hẹn" };
   }
 }

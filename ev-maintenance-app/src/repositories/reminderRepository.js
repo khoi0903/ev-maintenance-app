@@ -37,7 +37,7 @@ class ReminderRepository {
       .input("ReminderDate", sql.DateTime2, ReminderDate)
       .input("Status", sql.NVarChar(20), Status)
       .query(`
-        INSERT INTO Reminder (VehicleID, ReminderType, ReminderDate, Status, CreatedDate)
+        INSERT INTO Reminder (VehicleID, ReminderType, ReminderDate, Status, CreatedAt)
         OUTPUT INSERTED.*
         VALUES (@VehicleID, @ReminderType, @ReminderDate, @Status, SYSUTCDATETIME())
       `);

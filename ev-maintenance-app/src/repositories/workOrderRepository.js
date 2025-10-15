@@ -74,4 +74,20 @@ class WorkOrderRepository {
   }
 }
 
+
+  async getByAppointment(appointmentId) {
+    const pool = await poolPromise;
+    const r = await pool.request()
+      .input("AppointmentID", sql.Int, appointmentId)
+      .query(`
+        SELECT w.*, a.ScheduledDate, t.FullName AS TechnicianName
+        FROM WorkOrder w
+        LEFT JOIN Appointment a ON w.AppointmentID = a.AppointmentID
+        LEFT JOIN Account t ON w.TechnicianID = t.AccountID
+        WHERE w.AppointmentID = @AppointmentID
+        ORDER BY w.CreatedAt DESC
+      `);
+    return r.recordset;
+  }
+}
 module.exports = new WorkOrderRepository();

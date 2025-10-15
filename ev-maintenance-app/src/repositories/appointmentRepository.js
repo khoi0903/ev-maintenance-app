@@ -1,11 +1,7 @@
-// src/repositories/appointmentRepository.js
-// Repository Appointment: create with slot-lock, get by filters, assign technician
-// Sử dụng poolPromise + transaction để tránh overbooking
-
+// src/repositories/appointmentRepository.js (patched)
 const { poolPromise, sql } = require("../db");
 
 class AppointmentRepository {
-  // Lấy appointment theo id (kèm thông tin cơ bản)
   async getById(appointmentId) {
     const pool = await poolPromise;
     const r = await pool.request()
@@ -20,24 +16,38 @@ class AppointmentRepository {
     return r.recordset[0];
   }
 
-  // Lấy theo filter tổng quát
   async getAll({ accountId, status } = {}) {
     const pool = await poolPromise;
-    let sqlText = `
+    const req = pool.request();
+    let where = "WHERE 1=1";
+    if (accountId) { req.input("AccountID", sql.Int, accountId); where += " AND a.AccountID = @AccountID"; }
+    if (status)    { req.input("Status", sql.NVarChar(20), status); where += " AND a.Status = @Status"; }
+    const q = `
       SELECT a.*, v.LicensePlate, acc.FullName AS CustomerName
       FROM Appointment a
       LEFT JOIN Vehicle v ON a.VehicleID = v.VehicleID
       LEFT JOIN Account acc ON a.AccountID = acc.AccountID
-      WHERE 1=1
-    `;
-    if (accountId) sqlText += ` AND a.AccountID = ${parseInt(accountId,10)}`;
-    if (status) sqlText += ` AND a.Status = '${status}'`;
-    sqlText += ` ORDER BY a.ScheduledDate DESC`;
-    const r = await pool.request().query(sqlText);
+      ${where}
+      ORDER BY a.ScheduledDate DESC`;
+    const r = await req.query(q);
     return r.recordset;
   }
 
-  // Lấy theo customer
+  async getAllByAccount(accountId) {
+    const pool = await poolPromise;
+    const r = await pool.request()
+      .input("AccountID", sql.Int, accountId)
+      .query(`
+        SELECT a.*, v.LicensePlate, acc.FullName AS CustomerName
+        FROM Appointment a
+        LEFT JOIN Vehicle v ON a.VehicleID = v.VehicleID
+        LEFT JOIN Account acc ON a.AccountID = acc.AccountID
+        WHERE a.AccountID = @AccountID
+        ORDER BY a.ScheduledDate DESC
+      `);
+    return r.recordset;
+  }
+
   async getByCustomerId(customerId) {
     const pool = await poolPromise;
     const r = await pool.request()
@@ -48,7 +58,6 @@ class AppointmentRepository {
     return r.recordset;
   }
 
-  // Lấy theo technician (qua bảng liên kết)
   async getByTechnicianId(technicianId) {
     const pool = await poolPromise;
     const r = await pool.request()
@@ -62,16 +71,12 @@ class AppointmentRepository {
     return r.recordset;
   }
 
-  // Tạo appointment có kiểm tra capacity (transaction + SERIALIZABLE)
   async createAppointment({ AccountID, VehicleID, SlotID, ScheduledDate, Notes, DepositAmount }) {
     const pool = await poolPromise;
     const trx = new sql.Transaction(pool);
-
     try {
       await trx.begin(sql.ISOLATION_LEVEL.SERIALIZABLE);
       const req = new sql.Request(trx);
-
-      // Khóa row slot và đếm appointment
       const slotCheck = await req
         .input("SlotID", sql.Int, SlotID)
         .query(`
@@ -80,14 +85,10 @@ class AppointmentRepository {
           FROM Slot s
           WHERE s.SlotID = @SlotID
         `);
-
       if (!slotCheck.recordset[0]) throw new Error("Slot không tồn tại");
       const { Capacity, CurrentCount } = slotCheck.recordset[0];
-      if (CurrentCount >= Capacity) {
-        throw new Error("Slot đã đầy, vui lòng chọn khung giờ khác.");
-      }
+      if (CurrentCount >= Capacity) throw new Error("Slot đã đầy, vui lòng chọn khung giờ khác.");
 
-      // Insert appointment
       const inserted = await req
         .input("AccountID", sql.Int, AccountID)
         .input("VehicleID", sql.Int, VehicleID)
@@ -109,7 +110,6 @@ class AppointmentRepository {
     }
   }
 
-  // Confirm appointment (set ConfirmedByStaffID)
   async confirmAppointment(appointmentId, staffId) {
     const pool = await poolPromise;
     await pool.request()
@@ -124,7 +124,6 @@ class AppointmentRepository {
     return this.getById(appointmentId);
   }
 
-  // Gán technician (chèn vào bảng AppointmentTechnician nếu chưa có)
   async assignTechnician(appointmentId, technicianId) {
     const pool = await poolPromise;
     await pool.request()
@@ -138,7 +137,6 @@ class AppointmentRepository {
       `);
   }
 
-  // Tìm technician khả dụng (đơn giản: lấy tech ít workorder đang làm nhất)
   async findAvailableTechnician() {
     const pool = await poolPromise;
     const r = await pool.request().query(`
@@ -153,7 +151,6 @@ class AppointmentRepository {
     return r.recordset[0];
   }
 
-  // Cập nhật trạng thái appointment
   async updateStatus(appointmentId, status) {
     const pool = await poolPromise;
     await pool.request()
@@ -163,6 +160,10 @@ class AppointmentRepository {
       .query(`
         UPDATE Appointment SET Status=@Status, UpdatedAt=@updatedAt WHERE AppointmentID=@AppointmentID
       `);
+  }
+
+  async cancelAppointment(appointmentId) {
+    return this.updateStatus(appointmentId, 'Cancelled');
   }
 }
 
