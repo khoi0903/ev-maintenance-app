@@ -1,0 +1,9 @@
+{
+  "/signin/page": "app/signin/page.js",
+  "/user/progress/page": "app/user/progress/page.js",
+  "/admin/appointments/page": "app/admin/appointments/page.js",
+  "/admin/work-orders/technician/page": "app/admin/work-orders/technician/page.js",
+  "/admin/work-orders/technician/[id]/page": "app/admin/work-orders/technician/[id]/page.js",
+  "/user/workorders/[id]/page": "app/user/workorders/[id]/page.js",
+  "/user/payment/page": "app/user/payment/page.js"
+}
